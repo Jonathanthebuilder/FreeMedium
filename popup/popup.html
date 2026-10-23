@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FreeMedium</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <div class="brand">
+        <img src="../icons/icon-48.png" alt="FreeMedium" class="brand-logo" width="26" height="26">
+        <div>
+          <h1 class="brand-title">FreeMedium</h1>
+          <p class="brand-subtitle">Ad-Free Paywall Unlocker</p>
+        </div>
+      </div>
+      <span id="status-pill" class="status-pill">Ready</span>
+    </header>
+
+    <!-- Primary Current Tab Action Card -->
+    <section class="card action-card">
+      <div class="current-page-info">
+        <span class="info-label">Current Tab</span>
+        <span id="current-host" class="current-host">Detecting...</span>
+      </div>
+      <div class="primary-actions">
+        <button id="btn-unlock-current" class="btn btn-primary" type="button">
+          <span aria-hidden="true">🔓</span>
+          <span id="btn-unlock-label">Unlock Current Tab</span>
+        </button>
+        <button id="btn-copy-md" class="btn btn-secondary" type="button" title="Copy article as Markdown (Alt+M)">
+          <span aria-hidden="true">📋</span>
+          <span>Markdown</span>
+        </button>
+        <button id="btn-bookmark" class="btn btn-icon" type="button" title="Save to bookmarks">
+          <span id="bookmark-icon" aria-hidden="true">☆</span>
+        </button>
+      </div>
+
+      <!-- Mirror Selector -->
+      <div class="mirror-row">
+        <label for="select-mirror" class="mirror-label">Active Mirror</label>
+        <select id="select-mirror" class="mirror-select">
+          <option value="freedium_mirror">Freedium Mirror (freedium-mirror.cfd)</option>
+          <option value="freedium">Freedium (freedium.cfd)</option>
+          <option value="freedium_web">Freedium Web (Vercel)</option>
+          <option value="archive_newest">Archive.is (Newest)</option>
+          <option value="archive_oldest">Archive.is (Oldest)</option>
+        </select>
+      </div>
+
+      <!-- Manual URL Input (Collapsible or subtle) -->
+      <div class="manual-input-row">
+        <input id="input-custom-url" type="url" class="url-input" placeholder="Or paste any article URL to unlock...">
+        <button id="btn-paste-unlock" class="btn btn-small" type="button">Go</button>
+      </div>
+    </section>
+
+    <!-- Smart Automation Settings -->
+    <section class="card settings-card">
+      <h2 class="section-title">Smart Automation &amp; Purification</h2>
+      <div class="toggle-list">
+        <label class="toggle-item">
+          <div class="toggle-text">
+            <span class="toggle-name">Auto-Unlock on Paywall</span>
+            <span class="toggle-desc">Automatically redirect when a locked story is detected</span>
+          </div>
+          <input id="toggle-auto-unlock" type="checkbox" switch>
+        </label>
+
+        <label class="toggle-item">
+          <div class="toggle-text">
+            <span class="toggle-name">Floating Unlock Pill</span>
+            <span class="toggle-desc">Show 1-click "Unlock" button on Medium &amp; 6 publishers</span>
+          </div>
+          <input id="toggle-floating-btn" type="checkbox" switch>
+        </label>
+
+        <label class="toggle-item">
+          <div class="toggle-text">
+            <span class="toggle-name">Auto-Fallback Mirror</span>
+            <span class="toggle-desc">Switch mirror automatically if current mirror fails/times out</span>
+          </div>
+          <input id="toggle-auto-fallback" type="checkbox" switch>
+        </label>
+
+        <label class="toggle-item">
+          <div class="toggle-text">
+            <span class="toggle-name">Purify Mirror Popups &amp; Ads</span>
+            <span class="toggle-desc">Hide donation banners and announcement toasts on mirrors</span>
+          </div>
+          <input id="toggle-hide-popups" type="checkbox" switch>
+        </label>
+
+        <label class="toggle-item">
+          <div class="toggle-text">
+            <span class="toggle-name">Open Unlocked in New Tab</span>
+            <span class="toggle-desc">Keep original article tab open when unlocking</span>
+          </div>
+          <input id="toggle-new-tab" type="checkbox" switch>
+        </label>
+      </div>
+    </section>
+
+    <!-- History & Saved Library -->
+    <section class="card library-card">
+      <div class="tabs-header">
+        <div class="tabs-group" role="tablist">
+          <button id="tab-recent" class="tab-btn active" role="tab" aria-selected="true" type="button">Recent</button>
+          <button id="tab-saved" class="tab-btn" role="tab" aria-selected="false" type="button">Saved ★</button>
+        </div>
+        <button id="btn-clear-list" class="clear-link" type="button" title="Clear current list">Clear</button>
+      </div>
+      <ul id="library-list" class="library-list"></ul>
+    </section>
+
+    <div id="popup-toast" class="popup-toast" role="status" aria-live="polite"></div>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+/**
+ * FreeMedium — Mirror Purifier Stylesheet
+ * Automatically blocks announcement toasts, donation popups, and ad banners on mirror sites
+ * when `html.fm-purify-enabled` is present (enabled by default).
+ */
+
+html.fm-purify-enabled [data-sonner-toaster],
+html.fm-purify-enabled [data-sonner-toast],
+html.fm-purify-enabled .sonner-toast,
+html.fm-purify-enabled #bmc-wbtn,
+html.fm-purify-enabled iframe[src*="buymeacoffee"],
+html.fm-purify-enabled iframe[src*="ko-fi"],
+html.fm-purify-enabled a[href*="buymeacoffee.com"],
+html.fm-purify-enabled a[href*="patreon.com"],
+html.fm-purify-enabled div[class*="donate-banner"],
+html.fm-purify-enabled div[id*="donate"] {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}

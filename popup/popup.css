@@ -1,0 +1,454 @@
+:root {
+  color-scheme: dark;
+  --bg-base: #070709;
+  --bg-card: #111216;
+  --bg-elevated: #191b22;
+  --border-subtle: #282b36;
+  --border-strong: #3f4454;
+  --text-primary: #f5f6f8;
+  --text-secondary: #a1a6b5;
+  --accent-color: #10b981;
+  --accent-hover: #059669;
+  --focus-color: #34d399;
+  --warning-color: #f59e0b;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  width: 370px;
+  min-height: 460px;
+  background-color: var(--bg-base);
+  color: var(--text-primary);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 13px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+
+.app {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Header */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 2px 4px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.brand-logo {
+  border-radius: 6px;
+}
+
+.brand-title {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+
+.brand-subtitle {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.status-pill {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(16, 185, 129, 0.14);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+.status-pill.is-mirror {
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+  border-color: rgba(59, 130, 246, 0.4);
+}
+
+/* Cards */
+.card {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.current-page-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11.5px;
+}
+
+.info-label {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.current-host {
+  font-weight: 600;
+  color: var(--text-primary);
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Buttons */
+.primary-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.btn {
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 11px;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+
+.btn:active {
+  transform: scale(0.98);
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--focus-color);
+  outline-offset: 2px;
+}
+
+.btn-primary {
+  flex: 1;
+  background-color: var(--accent-color);
+  border-color: var(--accent-color);
+  color: #04130d;
+}
+
+.btn-primary:hover {
+  background-color: #34d399;
+  border-color: #34d399;
+}
+
+.btn-secondary {
+  background-color: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+.btn-secondary:hover {
+  background-color: #242731;
+}
+
+.btn-icon {
+  width: 36px;
+  padding: 0;
+  background-color: var(--bg-elevated);
+  color: var(--text-primary);
+  font-size: 15px;
+}
+
+.btn-icon.saved {
+  color: var(--warning-color);
+  border-color: var(--warning-color);
+}
+
+.btn-small {
+  background-color: var(--bg-elevated);
+  color: var(--text-primary);
+  padding: 6px 12px;
+}
+
+.btn-small:hover {
+  border-color: var(--accent-color);
+}
+
+/* Mirror Row */
+.mirror-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.mirror-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.mirror-select {
+  flex: 1;
+  background-color: var(--bg-elevated);
+  color: var(--text-primary);
+  border: 1px solid var(--border-strong);
+  border-radius: 7px;
+  padding: 5px 8px;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.mirror-select:focus-visible {
+  outline: 2px solid var(--focus-color);
+  outline-offset: 2px;
+}
+
+/* Manual URL input */
+.manual-input-row {
+  display: flex;
+  gap: 6px;
+}
+
+.url-input {
+  flex: 1;
+  background-color: var(--bg-base);
+  color: var(--text-primary);
+  border: 1px solid var(--border-strong);
+  border-radius: 7px;
+  padding: 6px 9px;
+  font-size: 12px;
+  font-family: inherit;
+}
+
+.url-input::placeholder {
+  color: var(--text-secondary);
+}
+
+.url-input:focus-visible {
+  outline: 2px solid var(--focus-color);
+  outline-offset: 1px;
+}
+
+/* Settings Toggles */
+.section-title {
+  font-size: 11.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+}
+
+.toggle-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.toggle-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  cursor: pointer;
+  padding: 3px 0;
+}
+
+.toggle-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.toggle-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.toggle-desc {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+input[type="checkbox"][switch] {
+  accent-color: var(--accent-color, #10b981);
+  width: 17px;
+  height: 17px;
+  margin: 0;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+input[type="checkbox"][switch]:focus-visible {
+  outline: 3px solid var(--focus-color, #34d399);
+  outline-offset: 3px;
+}
+
+/* Library */
+.tabs-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tabs-group {
+  display: flex;
+  gap: 4px;
+}
+
+.tab-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.tab-btn.active {
+  background-color: var(--bg-elevated);
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+}
+
+.clear-link {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.clear-link:hover {
+  color: var(--text-primary);
+}
+
+.library-list {
+  list-style: none;
+  max-height: 135px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.library-empty {
+  color: var(--text-secondary);
+  font-size: 12px;
+  text-align: center;
+  padding: 12px 0;
+}
+
+.library-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 5px 7px;
+  border-radius: 7px;
+  background-color: var(--bg-base);
+  border: 1px solid var(--border-subtle);
+}
+
+.library-open {
+  all: unset;
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+}
+
+.library-title {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.library-meta {
+  font-size: 10.5px;
+  color: var(--text-secondary);
+}
+
+.library-actions {
+  display: flex;
+  gap: 3px;
+}
+
+.lib-icon-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 3px 5px;
+  border-radius: 4px;
+}
+
+.lib-icon-btn:hover {
+  background-color: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+.lib-icon-btn.saved {
+  color: var(--warning-color);
+}
+
+/* Popup Toast */
+.popup-toast {
+  position: fixed;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%) translateY(8px);
+  background: var(--accent-color);
+  color: #04130d;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 7px 14px;
+  border-radius: 999px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.popup-toast.visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* Forced Colors Mode Fallback */
+@media (forced-colors: active) {
+  .card,
+  .btn,
+  .mirror-select,
+  .url-input,
+  .library-item {
+    border: 1px solid ButtonText;
+  }
+  .tab-btn.active {
+    outline: 2px solid Highlight;
+  }
+}

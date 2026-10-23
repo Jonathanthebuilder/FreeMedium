@@ -1,0 +1,125 @@
+{
+  "manifest_version": 3,
+  "name": "FreeMedium — Smart Paywall Unlocker",
+  "version": "1.0.0",
+  "description": "Unlock Medium & 6 leading publishers automatically or in one click. Features ad/popup purifier, mirror fallback, and Copy as Markdown.",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "FreeMedium — Unlock or Manage Articles",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    }
+  },
+  "background": {
+    "service_worker": "service-worker.js"
+  },
+  "permissions": [
+    "storage",
+    "tabs",
+    "contextMenus",
+    "scripting",
+    "alarms"
+  ],
+  "host_permissions": [
+    "*://*.medium.com/*",
+    "*://medium.com/*",
+    "*://*.towardsdatascience.com/*",
+    "*://*.betterprogramming.pub/*",
+    "*://*.levelup.gitconnected.com/*",
+    "*://*.javascript.plainenglish.io/*",
+    "*://*.python.plainenglish.io/*",
+    "*://*.aws.plainenglish.io/*",
+    "*://*.uxdesign.cc/*",
+    "*://*.uxplanet.org/*",
+    "*://*.itnext.io/*",
+    "*://*.infosecwriteups.com/*",
+    "*://*.nytimes.com/*",
+    "*://*.washingtonpost.com/*",
+    "*://*.bloomberg.com/*",
+    "*://*.reuters.com/*",
+    "*://*.economist.com/*",
+    "*://*.ft.com/*",
+    "*://*.freedium.cfd/*",
+    "*://freedium.cfd/*",
+    "*://*.freedium-mirror.cfd/*",
+    "*://freedium-mirror.cfd/*",
+    "*://freedium-mirror-web.vercel.app/*",
+    "*://*.archive.is/*",
+    "*://archive.is/*",
+    "*://*.archive.ph/*",
+    "*://archive.ph/*",
+    "*://*.archive.today/*",
+    "*://archive.today/*",
+    "*://*.archive.md/*",
+    "*://archive.md/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*.medium.com/*",
+        "*://medium.com/*",
+        "*://*.towardsdatascience.com/*",
+        "*://*.betterprogramming.pub/*",
+        "*://*.levelup.gitconnected.com/*",
+        "*://*.javascript.plainenglish.io/*",
+        "*://*.python.plainenglish.io/*",
+        "*://*.aws.plainenglish.io/*",
+        "*://*.uxdesign.cc/*",
+        "*://*.uxplanet.org/*",
+        "*://*.itnext.io/*",
+        "*://*.infosecwriteups.com/*",
+        "*://*.nytimes.com/*",
+        "*://*.washingtonpost.com/*",
+        "*://*.bloomberg.com/*",
+        "*://*.reuters.com/*",
+        "*://*.economist.com/*",
+        "*://*.ft.com/*"
+      ],
+      "js": ["content/publisher-detector.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "*://*.freedium.cfd/*",
+        "*://freedium.cfd/*",
+        "*://*.freedium-mirror.cfd/*",
+        "*://freedium-mirror.cfd/*",
+        "*://freedium-mirror-web.vercel.app/*",
+        "*://*.archive.is/*",
+        "*://archive.is/*",
+        "*://*.archive.ph/*",
+        "*://archive.ph/*",
+        "*://*.archive.today/*",
+        "*://archive.today/*",
+        "*://*.archive.md/*",
+        "*://archive.md/*"
+      ],
+      "css": ["content/mirror-purifier.css"],
+      "js": ["content/mirror-enhancer.js"],
+      "run_at": "document_start"
+    }
+  ],
+  "commands": {
+    "unlock-current-article": {
+      "suggested_key": {
+        "default": "Alt+U",
+        "mac": "Alt+U"
+      },
+      "description": "Unlock current article in FreeMedium"
+    },
+    "copy-article-markdown": {
+      "suggested_key": {
+        "default": "Alt+M",
+        "mac": "Alt+M"
+      },
+      "description": "Copy current article as Markdown"
+    }
+  }
+}
