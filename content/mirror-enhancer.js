@@ -8,16 +8,100 @@
 
   const TITLE_SUFFIX = ' — Freedium Mirror';
 
+  // Donation/support modals used by the mirror sites. They are ordinary
+  // shadcn-style dialogs, so match them by their copy instead of CSS classes.
+  const DONATION_MARKERS = [
+    'Support Freedium',
+    'Donate via PayPal',
+    'OTHER WAYS TO SUPPORT',
+    'Buy Me a Coffee',
+    'Buy me a coffee'
+  ];
+  const DIALOG_SELECTOR = '[data-slot="dialog-content"], [aria-modal="true"], [role="dialog"]';
+
+  let purifyEnabled = true;
+  let modalObserver = null;
+  let modalTimer = null;
+
+  /**
+   * Removes the donation/support modal and undoes the scroll/pointer lock that
+   * the dialog library applies to <body> while a modal is open.
+   */
+  function removeDonationModals() {
+    if (!purifyEnabled || !document.body) return;
+    let purged = false;
+
+    document.querySelectorAll(DIALOG_SELECTOR).forEach((dialog) => {
+      if (dialog.hasAttribute('data-fm-purged')) return;
+      const text = dialog.textContent || '';
+      if (!DONATION_MARKERS.some((marker) => text.includes(marker))) return;
+      dialog.setAttribute('data-fm-purged', '1');
+      dialog.setAttribute('aria-hidden', 'true');
+      dialog.style.setProperty('display', 'none', 'important');
+      purged = true;
+    });
+
+    if (!purged) return;
+
+    document.querySelectorAll('[data-slot="dialog-overlay"]').forEach((overlay) => {
+      overlay.setAttribute('data-fm-purged', '1');
+      overlay.style.setProperty('display', 'none', 'important');
+    });
+
+    for (const el of [document.body, document.documentElement]) {
+      if (!el) continue;
+      el.style.removeProperty('overflow');
+      el.style.removeProperty('pointer-events');
+      el.style.removeProperty('padding-right');
+      el.style.removeProperty('--scrollbar-width');
+    }
+  }
+
+  function startModalPurifier() {
+    if (!purifyEnabled) return;
+    removeDonationModals();
+
+    if (!modalObserver && document.documentElement) {
+      modalObserver = new MutationObserver((records) => {
+        if (modalTimer !== null) return;
+        let relevant = false;
+        for (const record of records) {
+          for (const node of record.addedNodes) {
+            if (node.nodeType !== 1) continue;
+            if (node.matches && node.matches(`${DIALOG_SELECTOR}, [data-slot="dialog-overlay"]`)) {
+              relevant = true;
+              break;
+            }
+          }
+          if (relevant) break;
+        }
+        if (!relevant) return;
+        modalTimer = setTimeout(() => {
+          modalTimer = null;
+          removeDonationModals();
+        }, 100);
+      });
+      modalObserver.observe(document.documentElement, { childList: true, subtree: true });
+    }
+
+    // Some mirrors mount the dialog after hydration; retry a few times.
+    for (const delay of [400, 1200, 3000, 6000]) {
+      setTimeout(removeDonationModals, delay);
+    }
+  }
+
   // Apply purification immediately at document_start based on settings
   chrome.storage.local.get('settings').then(({ settings = {} }) => {
-    const hidePopups = settings.hideMirrorPopups !== false;
-    if (hidePopups && document.documentElement) {
+    purifyEnabled = settings.hideMirrorPopups !== false;
+    if (purifyEnabled && document.documentElement) {
       document.documentElement.classList.add('fm-purify-enabled');
     }
+    if (purifyEnabled) startModalPurifier();
   }).catch(() => {
     if (document.documentElement) {
       document.documentElement.classList.add('fm-purify-enabled');
     }
+    startModalPurifier();
   });
 
   /**

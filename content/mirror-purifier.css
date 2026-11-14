@@ -19,3 +19,12 @@ html.fm-purify-enabled div[id*="donate"] {
   opacity: 0 !important;
   pointer-events: none !important;
 }
+
+/* Support/donation dialogs tagged and unlocked by mirror-enhancer.js */
+html.fm-purify-enabled [data-fm-purged],
+html.fm-purify-enabled [data-fm-purged] * {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}

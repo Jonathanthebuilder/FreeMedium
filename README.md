@@ -11,7 +11,7 @@
    - **多样触发**：支持右上角插件弹窗、页面/链接右键菜单 (`Unlock with FreeMedium`)、以及快捷键 `Alt+U`。
 
 2. **镜像站去弹窗与广告净化 (`content/mirror-purifier.css`)**
-   - 在 `document_start` 阶段自动注入净化样式，屏蔽 `freedium.cfd` / `freedium-mirror.cfd` 等镜像站的 Sonner 公告弹窗、BuyMeACoffee / Ko-fi / Patreon 打赏悬浮框及横幅。
+   - 在 `document_start` 阶段自动注入净化样式，屏蔽 `freedium.cfd` / `freedium-mirror.cfd` 等镜像站的 Sonner 公告弹窗、BuyMeACoffee / Ko-fi / Patreon 打赏悬浮框及横幅，以及 `Support Freedium` 打赏模态框（同时解除它造成的页面滚动与点击锁定）。
 
 3. **5 大镜像源自动故障切换 (`service-worker.js` + `content/mirror-enhancer.js`)**
    - 内置 5 个解锁源：`Freedium Mirror`、`Freedium`、`Freedium Web (Vercel)`、`Archive.is (Newest)`、`Archive.is (Oldest)`。
