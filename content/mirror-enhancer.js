@@ -345,6 +345,26 @@
       return { failed: true, reason: 'Mirror failed to fetch article' };
     }
 
+    // Freedium rejects publishers outside its supported list and returns a
+    // short "unsupported site" page instead of an article.
+    if (bodyText.includes('Site not supported') || bodyText.includes('UNSUPPORTED SITE')) {
+      return { failed: true, reason: 'Mirror does not support this site' };
+    }
+    if (bodyText.includes('ARTICLE NOT FOUND') || bodyText.includes('Article not found.')) {
+      return { failed: true, reason: 'Mirror could not find the article' };
+    }
+
+    // archive.today serves bot-protection and JS-gate pages; both mean the
+    // snapshot is not readable, so treat them as mirror failures.
+    const trimmedBody = bodyText.trim();
+    if (
+      trimmedBody.length < 2000 &&
+      (trimmedBody.includes('Please complete the security check') ||
+        trimmedBody.includes('Please enable JS and disable any ad blocker'))
+    ) {
+      return { failed: true, reason: 'Archive blocked by bot protection' };
+    }
+
     // Only exact error titles count; article titles may legitimately contain phrases like "not available".
     const errorTitles = [
       '404',
@@ -360,7 +380,6 @@
     }
 
     // Chrome / network error pages are short and carry a specific banner.
-    const trimmedBody = bodyText.trim();
     if (
       trimmedBody.length < 600 &&
       (trimmedBody.includes('This site can\'t be reached') || trimmedBody.includes('This site can’t be reached'))
