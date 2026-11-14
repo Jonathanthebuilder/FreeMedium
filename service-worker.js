@@ -50,19 +50,30 @@ function mirrorSupports(mirrorValue, articleUrl) {
  */
 function buildMirrorUrl(mirrorValue, articleUrl) {
   const found = MIRRORS.find(m => m.value === mirrorValue) || MIRRORS[0];
+  // Strip URL fragments; the article query string is passed verbatim so each
+  // mirror can parse its own query parameters (path-style mirrors stay raw).
+  const hashIndex = articleUrl.indexOf('#');
+  const cleanUrl = hashIndex === -1 ? articleUrl : articleUrl.slice(0, hashIndex);
   return found.base.endsWith('=')
-    ? found.base + encodeURIComponent(articleUrl)
-    : found.base + articleUrl;
+    ? found.base + encodeURIComponent(cleanUrl)
+    : found.base + cleanUrl;
 }
 
 /**
  * Gets the next supported mirror in the fallback ring.
+ * When `visited` is provided, already-tried mirrors are skipped.
+ * Returns -1 when no candidate exists (the ring was fully exhausted).
  */
-function getNextSupportedMirrorIndex(currentIndex, articleUrl) {
+function getNextSupportedMirrorIndex(currentIndex, articleUrl, visited = null) {
   let next = currentIndex;
   do {
     next = (next + 1) % MIRRORS.length;
-  } while (next !== currentIndex && !mirrorSupports(MIRRORS[next].value, articleUrl));
+    // Full circle without a candidate: never loop forever.
+    if (next === currentIndex) return -1;
+  } while (
+    !mirrorSupports(MIRRORS[next].value, articleUrl) ||
+    (visited && visited.includes(next))
+  );
   return next;
 }
 
@@ -73,6 +84,8 @@ function extractOriginalUrl(rawUrl) {
   if (!rawUrl) return '';
   try {
     const u = new URL(rawUrl);
+    // Fragments never belong to the article URL.
+    u.hash = '';
     if (u.hostname === 'freedium-mirror-web.vercel.app') {
       const q = u.searchParams.get('url');
       if (q) return q;
@@ -92,9 +105,12 @@ function extractOriginalUrl(rawUrl) {
       }
     }
     if (u.hostname.startsWith('archive.')) {
-      const m = u.pathname.match(/^\/(?:newest|oldest|time\/[^/]+)\/(https?:\/\/.+)$/);
+      // Handles /newest/, /oldest/, /time/<x>/, the canonical /<timestamp>/ form
+      // and bare /<url> archive links.
+      const m = u.pathname.match(/^\/(?:(?:newest|oldest|time\/[^/]+|\d{8,14})\/)?(https?:\/\/.+)$/);
       if (m) return m[1] + u.search;
     }
+    return u.href;
   } catch {
     // ignore invalid URL
   }
@@ -138,7 +154,8 @@ async function unlockArticle(rawUrl, sourceTabId, forceMirrorValue = null, force
   if (startIndex < 0) startIndex = 0;
 
   if (!mirrorSupports(MIRRORS[startIndex].value, originalUrl)) {
-    startIndex = getNextSupportedMirrorIndex(startIndex, originalUrl);
+    const nextSupported = getNextSupportedMirrorIndex(startIndex, originalUrl);
+    if (nextSupported >= 0) startIndex = nextSupported;
   }
 
   const targetUrl = buildMirrorUrl(MIRRORS[startIndex].value, originalUrl);
@@ -161,12 +178,15 @@ async function unlockArticle(rawUrl, sourceTabId, forceMirrorValue = null, force
         originalUrl,
         startMirrorIndex: startIndex,
         currentMirrorIndex: startIndex,
+        visited: [startIndex],
         status: 'loading',
         startedAt: Date.now()
       }
     });
-    if (settings.autoFallback && !MIRRORS[startIndex].value.startsWith('archive_')) {
-      await chrome.alarms.create(`fallback_timeout_${targetTabId}`, { delayInMinutes: 0.25 }); // 15 seconds
+    if (settings.autoFallback) {
+      // chrome.alarms clamps delays below 30 seconds, so 0.5 min is the real minimum.
+      await chrome.alarms.clear(`fallback_timeout_${targetTabId}`);
+      await chrome.alarms.create(`fallback_timeout_${targetTabId}`, { delayInMinutes: 0.5 }); // 30 seconds
     }
   }
 
@@ -185,10 +205,17 @@ async function tryNextMirrorForTab(tabId, reason = 'failed') {
 
   await chrome.alarms.clear(`fallback_timeout_${tabId}`);
 
-  const nextIndex = getNextSupportedMirrorIndex(state.currentMirrorIndex, state.originalUrl);
-  if (nextIndex === state.startMirrorIndex) {
+  // Track visited mirrors: an unsupported start mirror can never trap the ring,
+  // and a manual retry after exhaustion starts a fresh chain.
+  let visited = Array.isArray(state.visited) ? state.visited : [state.currentMirrorIndex];
+  if (state.status === 'exhausted') {
+    visited = [state.currentMirrorIndex];
+  }
+
+  const nextIndex = getNextSupportedMirrorIndex(state.currentMirrorIndex, state.originalUrl, visited);
+  if (nextIndex === -1) {
     await chrome.storage.session.set({
-      [sessionKey]: { ...state, status: 'exhausted', lastReason: reason }
+      [sessionKey]: { ...state, status: 'exhausted', visited, lastReason: reason }
     });
     return { ok: false, exhausted: true };
   }
@@ -200,14 +227,18 @@ async function tryNextMirrorForTab(tabId, reason = 'failed') {
     [sessionKey]: {
       ...state,
       currentMirrorIndex: nextIndex,
+      visited: [...visited, nextIndex],
       status: 'loading',
       lastReason: reason,
       startedAt: Date.now()
     }
   });
 
-  if (settings.autoFallback && !nextMirror.value.startsWith('archive_')) {
-    await chrome.alarms.create(`fallback_timeout_${tabId}`, { delayInMinutes: 0.25 });
+  if (settings.autoFallback) {
+    // Archive mirrors are timed out too, otherwise a hung page stalls the chain.
+    // chrome.alarms clamps delays below 30 seconds, so 0.5 min is the real minimum.
+    await chrome.alarms.clear(`fallback_timeout_${tabId}`);
+    await chrome.alarms.create(`fallback_timeout_${tabId}`, { delayInMinutes: 0.5 }); // 30 seconds
   }
 
   try {
@@ -274,18 +305,59 @@ chrome.commands.onCommand.addListener(async (command) => {
   }
 });
 
+/**
+ * Returns true when the URL points at a supported mirror host.
+ */
+function isMirrorUrl(url) {
+  if (!url) return false;
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    return (
+      host === 'freedium.cfd' ||
+      host.endsWith('.freedium.cfd') ||
+      host === 'freedium-mirror.cfd' ||
+      host.endsWith('.freedium-mirror.cfd') ||
+      host === 'freedium-mirror-web.vercel.app' ||
+      host.startsWith('archive.')
+    );
+  } catch {
+    return false;
+  }
+}
+
 // Handle Alarm Timeouts for Mirror Auto-Fallback
 chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (!alarm.name.startsWith('fallback_timeout_')) return;
   const tabId = Number(alarm.name.replace('fallback_timeout_', ''));
   if (!tabId) return;
 
+  // Never hijack a tab the user has navigated away from (or closed).
+  let tab = null;
+  try {
+    tab = await chrome.tabs.get(tabId);
+  } catch {
+    tab = null;
+  }
+
+  if (!tab || !isMirrorUrl(tab.url)) {
+    await chrome.storage.session.remove(`unlock_state_${tabId}`);
+    await chrome.alarms.clear(alarm.name);
+    return;
+  }
+
   const sessionKey = `unlock_state_${tabId}`;
   const data = await chrome.storage.session.get(sessionKey);
   const state = data[sessionKey];
   if (state && state.status === 'loading') {
-    await tryNextMirrorForTab(tabId, 'Mirror timed out (15s)');
+    await tryNextMirrorForTab(tabId, 'Mirror timed out (30s)');
   }
+});
+
+// Clear unlock state as soon as the tab navigates away from a mirror.
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) => {
+  if (!changeInfo.url || isMirrorUrl(changeInfo.url)) return;
+  await chrome.storage.session.remove(`unlock_state_${tabId}`);
+  await chrome.alarms.clear(`fallback_timeout_${tabId}`);
 });
 
 // Monitor tab status for HTTP 5xx or network error pages if needed
@@ -388,12 +460,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
               const data = await chrome.storage.session.get(sessionKey);
               if (!data[sessionKey] && message.url) {
                 const orig = extractOriginalUrl(message.url);
-                const curIdx = MIRRORS.findIndex(m => message.url.startsWith(m.base));
+                // Never start the chain on an unsupported mirror index.
+                let curIdx = MIRRORS.findIndex(m => message.url.startsWith(m.base));
+                if (curIdx < 0) curIdx = 0;
+                if (!mirrorSupports(MIRRORS[curIdx].value, orig)) {
+                  curIdx = getNextSupportedMirrorIndex(curIdx, orig, null);
+                  if (curIdx === -1) curIdx = 0;
+                }
                 await chrome.storage.session.set({
                   [sessionKey]: {
                     originalUrl: orig,
-                    startMirrorIndex: curIdx >= 0 ? curIdx : 0,
-                    currentMirrorIndex: curIdx >= 0 ? curIdx : 0,
+                    startMirrorIndex: curIdx,
+                    currentMirrorIndex: curIdx,
+                    visited: [curIdx],
                     status: 'loading'
                   }
                 });

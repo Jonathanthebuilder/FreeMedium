@@ -239,12 +239,41 @@
   btnCopyMd.addEventListener('click', async () => {
     if (!activeTab || !activeTab.id) return;
     try {
-      const res = await chrome.tabs.sendMessage(activeTab.id, { type: 'COPY_MARKDOWN' });
-      if (res && res.ok) {
-        showToast('Copied article as Markdown!');
-      } else {
-        showToast('Open an article first to copy Markdown');
+      const res = await chrome.tabs.sendMessage(activeTab.id, { type: 'EXTRACT_MARKDOWN' });
+      if (!res || !res.ok || !res.markdown) {
+        showToast('Could not extract article text from this tab');
+        return;
       }
+
+      // Copy from the popup document, which owns focus while it is open
+      let copied = false;
+      try {
+        await navigator.clipboard.writeText(res.markdown);
+        copied = true;
+      } catch {
+        // Fall back to execCommand copy below
+      }
+
+      if (!copied) {
+        let textarea = null;
+        try {
+          textarea = document.createElement('textarea');
+          textarea.value = res.markdown;
+          textarea.setAttribute('readonly', '');
+          textarea.style.position = 'fixed';
+          textarea.style.top = '-9999px';
+          textarea.style.left = '-9999px';
+          document.body.appendChild(textarea);
+          textarea.select();
+          copied = document.execCommand('copy');
+        } catch {
+          copied = false;
+        } finally {
+          if (textarea && textarea.parentNode) textarea.parentNode.removeChild(textarea);
+        }
+      }
+
+      showToast(copied ? 'Copied article as Markdown!' : 'Clipboard write failed');
     } catch {
       showToast('Cannot extract Markdown on this tab');
     }
@@ -297,7 +326,11 @@
         // ignore
       }
     }
-    if (!val || !val.startsWith('http')) {
+    if (!val) {
+      showToast('Paste a URL or type one');
+      return;
+    }
+    if (!val.startsWith('http')) {
       showToast('Enter a valid http/https article URL');
       return;
     }

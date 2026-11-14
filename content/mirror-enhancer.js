@@ -203,6 +203,22 @@
   }
 
   /**
+   * Returns true when the mirror page already shows a substantial rendered article.
+   * Used to avoid mistaking incidental strings in real content for mirror errors.
+   */
+  function hasRenderedArticle() {
+    let best = null;
+    const nodes = document.querySelectorAll('.prose');
+    for (let i = 0; i < nodes.length; i++) {
+      if (!best || (nodes[i].textContent || '').length > (best.textContent || '').length) {
+        best = nodes[i];
+      }
+    }
+    const candidate = best || document.querySelector('article') || document.querySelector('main');
+    return Boolean(candidate && (candidate.textContent || '').length > 400);
+  }
+
+  /**
    * Checks if the mirror returned an error / offline page (ported from WebViewActivity.java).
    */
   function checkMirrorFailure() {
@@ -210,22 +226,41 @@
     const title = (document.title || '').trim();
     const lowerTitle = title.toLowerCase();
 
+    // Real rendered article content wins over error-like strings in the page.
+    if (hasRenderedArticle()) {
+      return { failed: false, reason: '' };
+    }
+
     if (bodyText.includes('Reconnect to read new articles')) {
       return { failed: true, reason: 'Freedium offline service worker error' };
     }
     if (bodyText.includes('Could not load this article') || bodyText.includes('Unable to fetch the article')) {
       return { failed: true, reason: 'Mirror failed to fetch article' };
     }
-    if (
-      lowerTitle === '404' ||
-      lowerTitle === 'error' ||
-      lowerTitle.includes('not available') ||
-      lowerTitle.includes('can\'t be reached') ||
-      lowerTitle.includes('502 bad gateway') ||
-      lowerTitle.includes('504 gateway time-out')
-    ) {
+
+    // Only exact error titles count; article titles may legitimately contain phrases like "not available".
+    const errorTitles = [
+      '404',
+      'error',
+      '502 bad gateway',
+      '504 gateway time-out',
+      'service unavailable',
+      'this page isn\'t working',
+      'this page isn’t working'
+    ];
+    if (errorTitles.includes(lowerTitle)) {
       return { failed: true, reason: `HTTP error (${title})` };
     }
+
+    // Chrome / network error pages are short and carry a specific banner.
+    const trimmedBody = bodyText.trim();
+    if (
+      trimmedBody.length < 600 &&
+      (trimmedBody.includes('This site can\'t be reached') || trimmedBody.includes('This site can’t be reached'))
+    ) {
+      return { failed: true, reason: 'Network error page' };
+    }
+
     return { failed: false, reason: '' };
   }
 
@@ -247,19 +282,58 @@
     setTimeout(() => toastEl.classList.remove('visible'), 2500);
   }
 
-  async function copyMarkdownFlow(originalUrl) {
+  /**
+   * Builds the exact Markdown text copied by COPY_MARKDOWN.
+   * Returns null when no article text can be extracted.
+   */
+  function buildMarkdownText(originalUrl) {
     const md = extractArticleMarkdown();
-    if (!md) {
+    if (!md) return null;
+    const sourceUrl = originalUrl || window.location.href;
+    return `${md}\n\n---\n\nSource: ${sourceUrl}\n`;
+  }
+
+  /**
+   * Last-resort clipboard fallback for pages where the async Clipboard API is blocked.
+   */
+  function legacyCopyToClipboard(text) {
+    if (!document.body) return false;
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.setAttribute('readonly', '');
+    textarea.style.position = 'fixed';
+    textarea.style.top = '-9999px';
+    textarea.style.left = '-9999px';
+    document.body.appendChild(textarea);
+    textarea.select();
+    if (textarea.setSelectionRange) {
+      textarea.setSelectionRange(0, textarea.value.length);
+    }
+    let ok = false;
+    try {
+      ok = document.execCommand('copy');
+    } catch {
+      ok = false;
+    }
+    textarea.remove();
+    return ok;
+  }
+
+  async function copyMarkdownFlow(originalUrl) {
+    const finalMd = buildMarkdownText(originalUrl);
+    if (!finalMd) {
       showToast('Could not extract article text');
       return { ok: false };
     }
-    const sourceUrl = originalUrl || window.location.href;
-    const finalMd = `${md}\n\n---\n\nSource: ${sourceUrl}\n`;
     try {
       await navigator.clipboard.writeText(finalMd);
       showToast('Copied article as Markdown!');
       return { ok: true };
     } catch {
+      if (legacyCopyToClipboard(finalMd)) {
+        showToast('Copied article as Markdown!');
+        return { ok: true };
+      }
       showToast('Clipboard write failed');
       return { ok: false };
     }
@@ -503,10 +577,19 @@
     window.addEventListener('DOMContentLoaded', onMirrorReady, { once: true });
   }
 
-  // Listen for Copy as Markdown or Toast messages from Popup / Service Worker
+  // Listen for Copy as Markdown, Markdown extraction or Toast messages from Popup / Service Worker
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (message.type === 'COPY_MARKDOWN') {
       copyMarkdownFlow().then(res => sendResponse(res));
+      return true;
+    }
+    if (message.type === 'EXTRACT_MARKDOWN') {
+      const markdown = buildMarkdownText();
+      if (!markdown) {
+        sendResponse({ ok: false, error: 'Could not extract article text' });
+      } else {
+        sendResponse({ ok: true, markdown });
+      }
       return true;
     }
     if (message.type === 'SHOW_TOAST') {

@@ -25,7 +25,9 @@
     "tabs",
     "contextMenus",
     "scripting",
-    "alarms"
+    "alarms",
+    "clipboardWrite",
+    "clipboardRead"
   ],
   "host_permissions": [
     "*://*.medium.com/*",

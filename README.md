@@ -15,7 +15,7 @@
 
 3. **5 大镜像源自动故障切换 (`service-worker.js` + `content/mirror-enhancer.js`)**
    - 内置 5 个解锁源：`Freedium Mirror`、`Freedium`、`Freedium Web (Vercel)`、`Archive.is (Newest)`、`Archive.is (Oldest)`。
-   - 当首选镜像站超过 15 秒未响应，或返回 `Reconnect to read new articles` / `Could not load this article` / `502/404` 错误时，自动切换到下一个可用镜像源（并自动识别非 Medium 域名跳过仅支持 Medium 的 Web 镜像）。
+   - 当首选镜像站超过 30 秒未响应，或返回 `Reconnect to read new articles` / `Could not load this article` / `502/404` 错误时，自动切换到下一个可用镜像源（并自动识别非 Medium 域名跳过仅支持 Medium 的 Web 镜像）。
 
 4. **一键复制为 Markdown + 阅读进度记忆 (`content/mirror-enhancer.js`)**
    - 完整移植并增强原项目 Android 端的 DOM-to-Markdown 解析引擎，在镜像阅读页右下角提供悬浮工具栏（或按 `Alt+M` / 右键菜单），一键将文章（含各级标题、代码块语言标识、表格、列表、图片与原文链接）复制为干净的 Markdown。
