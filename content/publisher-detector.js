@@ -8,6 +8,29 @@
 (function () {
   'use strict';
 
+  // Shared i18n layer (lib/i18n.js). The literal fallbacks keep the script
+  // usable in isolation and guarantee English output is unchanged.
+  const i18n = typeof FM_I18N !== 'undefined' ? FM_I18N : null;
+
+  function t(key, params, fallback) {
+    if (i18n && typeof i18n.t === 'function') return i18n.t(key, params);
+    return fallback === undefined ? key : fallback;
+  }
+
+  function initI18n() {
+    if (!i18n || typeof i18n.initFromStorage !== 'function') return Promise.resolve();
+    return Promise.resolve(i18n.initFromStorage()).catch(() => {});
+  }
+
+  function setUiLanguage(settings) {
+    if (i18n && typeof i18n.setLanguage === 'function') {
+      i18n.setLanguage(settings && settings.language);
+    }
+  }
+
+  // Resolved once before any UI text is created.
+  const i18nReady = initI18n();
+
   const NON_ARTICLE_PATHS = new Set([
     '/', '/me', '/new-story', '/plans', '/membership', '/search',
     '/tag', '/topics', '/about', '/jobs', '/creators', '/m/signin'
@@ -20,6 +43,9 @@
 
   let pillHost = null;
   let pillButton = null;
+  let pillLabel = null;
+  let pillCloseBtn = null;
+  let pillUnlocking = false;
   let paywallBadge = null;
   let autoUnlockTriggeredForUrl = '';
   let lastCheckedUrl = window.location.href;
@@ -61,7 +87,7 @@
     // 1. Medium Member-only indicators
     const tierMeta = document.querySelector('meta[property="article:tier"], meta[name="article:tier"]');
     if (tierMeta && tierMeta.content && tierMeta.content.toLowerCase() === 'locked') {
-      return { locked: true, reason: 'Member-only story' };
+      return { locked: true, reason: t('paywall.memberOnly', null, 'Member-only story') };
     }
 
     // Check JSON-LD schema for isAccessibleForFree: false
@@ -69,13 +95,13 @@
     for (const s of ldScripts) {
       const txt = s.textContent || '';
       if (/"isAccessibleForFree"\s*:\s*(false|"False")/i.test(txt)) {
-        return { locked: true, reason: 'Subscriber-only article' };
+        return { locked: true, reason: t('paywall.subscriberOnly', null, 'Subscriber-only article') };
       }
     }
 
     // Cheap DOM markers first; only read body.innerText if none of them matched
     if (document.querySelector('[data-testid="paywall"], #paywall-background-color')) {
-      return { locked: true, reason: 'Member-only story' };
+      return { locked: true, reason: t('paywall.memberOnly', null, 'Member-only story') };
     }
 
     // Other publishers (NYT, WaPo, FT, Economist, Bloomberg) paywall gates
@@ -84,7 +110,7 @@
         '#gateway-content, [data-testid="paywall-overlay"], .paywall-overlay, .tp-modal, [data-qa="paywall-regwall"]'
       )
     ) {
-      return { locked: true, reason: 'Paywall detected' };
+      return { locked: true, reason: t('paywall.detected', null, 'Paywall detected') };
     }
 
     // Lazily read the body text only when the DOM markers did not already decide
@@ -96,7 +122,7 @@
         bodyText.includes('Create an account to read the full story')
       )
     ) {
-      return { locked: true, reason: 'Member-only story' };
+      return { locked: true, reason: t('paywall.memberOnly', null, 'Member-only story') };
     }
 
     return { locked: false, reason: '' };
@@ -457,32 +483,33 @@
 
       pillButton = document.createElement('button');
       pillButton.className = 'fm-unlock-btn';
-      pillButton.title = 'Unlock full article via FreeMedium (Alt+U)';
+      pillButton.title = t('pill.title', null, 'Unlock full article via FreeMedium (Alt+U)');
 
       const dot = document.createElement('span');
       dot.className = 'fm-dot';
 
-      const label = document.createElement('span');
-      label.textContent = 'Unlock with FreeMedium';
+      pillLabel = document.createElement('span');
+      pillLabel.textContent = t('pill.unlock', null, 'Unlock with FreeMedium');
 
       paywallBadge = document.createElement('span');
       paywallBadge.className = 'fm-badge';
-      paywallBadge.textContent = 'Paywall';
+      paywallBadge.textContent = t('pill.paywall', null, 'Paywall');
 
-      pillButton.append(dot, label, paywallBadge);
+      pillButton.append(dot, pillLabel, paywallBadge);
 
-      const closeBtn = document.createElement('button');
-      closeBtn.className = 'fm-close-btn';
-      closeBtn.title = 'Dismiss for this page';
-      closeBtn.textContent = '✕';
-      closeBtn.addEventListener('click', (e) => {
+      pillCloseBtn = document.createElement('button');
+      pillCloseBtn.className = 'fm-close-btn';
+      pillCloseBtn.title = t('pill.dismiss', null, 'Dismiss for this page');
+      pillCloseBtn.textContent = '✕';
+      pillCloseBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         dismissedForUrl = window.location.href;
         pillHost.style.display = 'none';
       });
 
       pillButton.addEventListener('click', () => {
-        label.textContent = 'Unlocking...';
+        pillUnlocking = true;
+        pillLabel.textContent = t('pill.unlocking', null, 'Unlocking...');
         chrome.runtime.sendMessage({
           type: 'UNLOCK_URL',
           url: window.location.href
@@ -493,7 +520,7 @@
       toast.className = 'fm-toast';
       toast.id = 'fm-toast';
 
-      wrap.append(pillButton, closeBtn);
+      wrap.append(pillButton, pillCloseBtn);
       shadow.append(style, wrap, toast);
       document.documentElement.appendChild(pillHost);
     }
@@ -505,6 +532,24 @@
       paywallBadge.textContent = paywallInfo.reason || 'Locked';
     } else {
       wrap.classList.remove('is-locked');
+    }
+  }
+
+  /**
+   * Re-applies the localized pill labels without disturbing a pending unlock.
+   */
+  function refreshPillTexts() {
+    if (pillButton) {
+      pillButton.title = t('pill.title', null, 'Unlock full article via FreeMedium (Alt+U)');
+    }
+    if (pillLabel && !pillUnlocking) {
+      pillLabel.textContent = t('pill.unlock', null, 'Unlock with FreeMedium');
+    }
+    if (pillCloseBtn) {
+      pillCloseBtn.title = t('pill.dismiss', null, 'Dismiss for this page');
+    }
+    if (paywallBadge) {
+      paywallBadge.textContent = t('pill.paywall', null, 'Paywall');
     }
   }
 
@@ -537,7 +582,7 @@
       chrome.runtime.sendMessage({ type: 'SET_BADGE', text: 'LOCK', color: '#f59e0b' });
       if (cachedSettings.autoUnlockPaywall && autoUnlockTriggeredForUrl !== currentUrl) {
         autoUnlockTriggeredForUrl = currentUrl;
-        showToast('Paywall detected! Auto-unlocking via FreeMedium...');
+        showToast(t('toast.paywallAuto', null, 'Paywall detected! Auto-unlocking via FreeMedium...'));
         setTimeout(() => {
           chrome.runtime.sendMessage({
             type: 'UNLOCK_URL',
@@ -588,18 +633,18 @@
       (async () => {
         const md = extractPageMarkdown();
         if (!md || !md.trim()) {
-          showToast('Could not find article text');
+          showToast(t('toast.noArticleText', null, 'Could not find article text'));
           sendResponse({ ok: false });
           return;
         }
-        const fullMd = `${md}\n\n---\n\nSource: ${window.location.href}\n`;
+        const fullMd = `${md}\n\n---\n\n${t('md.sourceFooter', { url: window.location.href }, `Source: ${window.location.href}`)}\n`;
         try {
           await navigator.clipboard.writeText(fullMd);
-          showToast('Copied article as Markdown!');
+          showToast(t('toast.copied', null, 'Copied article as Markdown!'));
           sendResponse({ ok: true });
         } catch {
           if (copyTextFallback(fullMd)) {
-            showToast('Copied article as Markdown!');
+            showToast(t('toast.copied', null, 'Copied article as Markdown!'));
             sendResponse({ ok: true });
           } else {
             sendResponse({ ok: false });
@@ -616,7 +661,7 @@
       }
       sendResponse({
         ok: true,
-        markdown: `${md}\n\n---\n\nSource: ${window.location.href}\n`
+        markdown: `${md}\n\n---\n\n${t('md.sourceFooter', { url: window.location.href }, `Source: ${window.location.href}`)}\n`
       });
       return true;
     }
@@ -630,22 +675,27 @@
     if (evaluateTimer !== null) return;
     evaluateTimer = setTimeout(() => {
       evaluateTimer = null;
-      evaluatePage();
+      i18nReady.then(() => evaluatePage());
     }, delay);
   }
 
-  // Initial check and SPA route observer (Medium navigates client-side)
-  chrome.storage.local.get('settings')
+  // Initial check and SPA route observer (Medium navigates client-side).
+  // Resolve the language before the pill/badge produce any text.
+  i18nReady
+    .then(() => chrome.storage.local.get('settings'))
     .then(({ settings }) => {
       cachedSettings = { ...DEFAULT_SETTINGS, ...(settings || {}) };
+      setUiLanguage(settings);
     })
     .catch(() => {})
     .finally(() => evaluatePage());
-
-  // Keep the cached settings in sync without hitting storage on every evaluation
+  // Keep the cached settings and the live UI language in sync
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== 'local' || !changes.settings) return;
-    cachedSettings = { ...DEFAULT_SETTINGS, ...(changes.settings.newValue || {}) };
+    const nextSettings = changes.settings.newValue || {};
+    cachedSettings = { ...DEFAULT_SETTINGS, ...nextSettings };
+    setUiLanguage(nextSettings);
+    refreshPillTexts();
     evaluatePage();
   });
 

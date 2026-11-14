@@ -4,6 +4,8 @@
  * keyboard shortcuts, and storage synchronization.
  */
 
+importScripts('lib/i18n.js');
+
 const MIRRORS = [
   { label: 'Freedium Mirror', value: 'freedium_mirror', base: 'https://freedium-mirror.cfd/' },
   { label: 'Freedium', value: 'freedium', base: 'https://freedium.cfd/' },
@@ -19,6 +21,7 @@ const NON_MEDIUM_HOSTS = [
 
 const DEFAULT_SETTINGS = {
   mirror: 'freedium_mirror',
+  language: 'auto',
   autoUnlockPaywall: true,
   showFloatingButton: true,
   autoFallback: true,
@@ -27,6 +30,37 @@ const DEFAULT_SETTINGS = {
 };
 
 const MAX_HISTORY = 50;
+
+// The service worker may be terminated and restarted at any time, so the
+// language setting is re-read once per wake-up before localizing UI strings.
+let languageReady = null;
+function ensureLanguage() {
+  if (!languageReady) languageReady = FM_I18N.initFromStorage();
+  return languageReady;
+}
+
+/**
+ * (Re)creates the browser context menus with titles in the active language.
+ */
+function buildContextMenus() {
+  chrome.contextMenus.removeAll(() => {
+    chrome.contextMenus.create({
+      id: 'freemedium-unlock-page',
+      title: FM_I18N.t('menu.unlockPage'),
+      contexts: ['page']
+    });
+    chrome.contextMenus.create({
+      id: 'freemedium-unlock-link',
+      title: FM_I18N.t('menu.unlockLink'),
+      contexts: ['link']
+    });
+    chrome.contextMenus.create({
+      id: 'freemedium-copy-markdown',
+      title: FM_I18N.t('menu.copyMarkdown'),
+      contexts: ['page']
+    });
+  });
+}
 
 /**
  * Checks if a specific mirror supports the given article URL.
@@ -256,23 +290,16 @@ chrome.runtime.onInstalled.addListener(async () => {
     await chrome.storage.local.set({ settings: DEFAULT_SETTINGS });
   }
 
-  chrome.contextMenus.removeAll(() => {
-    chrome.contextMenus.create({
-      id: 'freemedium-unlock-page',
-      title: 'Unlock this page with FreeMedium',
-      contexts: ['page']
-    });
-    chrome.contextMenus.create({
-      id: 'freemedium-unlock-link',
-      title: 'Unlock link with FreeMedium',
-      contexts: ['link']
-    });
-    chrome.contextMenus.create({
-      id: 'freemedium-copy-markdown',
-      title: 'Copy article as Markdown',
-      contexts: ['page']
-    });
-  });
+  await ensureLanguage();
+  buildContextMenus();
+});
+
+// Rebuild menu titles as soon as the language setting changes.
+chrome.storage.onChanged.addListener((changes) => {
+  if (!changes.settings) return;
+  const nextSettings = changes.settings.newValue;
+  FM_I18N.setLanguage(nextSettings && nextSettings.language);
+  buildContextMenus();
 });
 
 // Handle Context Menu clicks with visual toast confirmation
@@ -281,11 +308,13 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 
   if (info.menuItemId === 'freemedium-unlock-page') {
     const pageUrl = info.pageUrl || tab.url;
-    await showTabToast(tab.id, 'Unlocking article via FreeMedium...');
+    await ensureLanguage();
+    await showTabToast(tab.id, FM_I18N.t('toast.unlocking'));
     await unlockArticle(pageUrl, tab.id);
   } else if (info.menuItemId === 'freemedium-unlock-link') {
     const linkUrl = info.linkUrl;
-    await showTabToast(tab.id, 'Opening unlocked link in new tab...');
+    await ensureLanguage();
+    await showTabToast(tab.id, FM_I18N.t('toast.openingLink'));
     await unlockArticle(linkUrl, tab.id, null, false);
   } else if (info.menuItemId === 'freemedium-copy-markdown') {
     await triggerCopyMarkdownInTab(tab.id);
@@ -298,7 +327,8 @@ chrome.commands.onCommand.addListener(async (command) => {
   if (!tab || !tab.id) return;
 
   if (command === 'unlock-current-article' && tab.url) {
-    await showTabToast(tab.id, 'Unlocking article via FreeMedium...');
+    await ensureLanguage();
+    await showTabToast(tab.id, FM_I18N.t('toast.unlocking'));
     await unlockArticle(tab.url, tab.id);
   } else if (command === 'copy-article-markdown') {
     await triggerCopyMarkdownInTab(tab.id);

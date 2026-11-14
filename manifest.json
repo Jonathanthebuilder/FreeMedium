@@ -84,7 +84,7 @@
         "*://*.economist.com/*",
         "*://*.ft.com/*"
       ],
-      "js": ["content/publisher-detector.js"],
+      "js": ["lib/i18n.js", "content/publisher-detector.js"],
       "run_at": "document_idle"
     },
     {
@@ -104,7 +104,7 @@
         "*://archive.md/*"
       ],
       "css": ["content/mirror-purifier.css"],
-      "js": ["content/mirror-enhancer.js"],
+      "js": ["lib/i18n.js", "content/mirror-enhancer.js"],
       "run_at": "document_start"
     }
   ],

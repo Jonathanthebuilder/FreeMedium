@@ -6,6 +6,28 @@
 (function () {
   'use strict';
 
+  // Shared i18n layer (lib/i18n.js). The literal fallbacks keep the script
+  // usable in isolation and guarantee English output is unchanged.
+  const i18n = typeof FM_I18N !== 'undefined' ? FM_I18N : null;
+
+  function t(key, params, fallback) {
+    if (i18n && typeof i18n.t === 'function') return i18n.t(key, params);
+    return fallback === undefined ? key : fallback;
+  }
+
+  function initI18n() {
+    if (!i18n || typeof i18n.initFromStorage !== 'function') return Promise.resolve();
+    return Promise.resolve(i18n.initFromStorage()).catch(() => {});
+  }
+
+  function setUiLanguage(settings) {
+    if (i18n && typeof i18n.setLanguage === 'function') {
+      i18n.setLanguage(settings && settings.language);
+    }
+  }
+
+  const i18nReady = initI18n();
+
   const TITLE_SUFFIX = ' — Freedium Mirror';
 
   // Donation/support modals used by the mirror sites. They are ordinary
@@ -92,6 +114,7 @@
 
   // Apply purification immediately at document_start based on settings
   chrome.storage.local.get('settings').then(({ settings = {} }) => {
+    setUiLanguage(settings);
     purifyEnabled = settings.hideMirrorPopups !== false;
     if (purifyEnabled && document.documentElement) {
       document.documentElement.classList.add('fm-purify-enabled');
@@ -358,6 +381,12 @@
 
   let toolbarHost = null;
   let toastEl = null;
+  let toolbarMdBtn = null;
+  let toolbarBmBtn = null;
+  let toolbarSwitchBtn = null;
+  let toolbarOrigBtn = null;
+  let toolbarCloseBtn = null;
+  let toolbarBookmarked = false;
 
   function showToast(msg) {
     if (!toastEl) return;
@@ -374,7 +403,7 @@
     const md = extractArticleMarkdown();
     if (!md) return null;
     const sourceUrl = originalUrl || window.location.href;
-    return `${md}\n\n---\n\nSource: ${sourceUrl}\n`;
+    return `${md}\n\n---\n\n${t('md.sourceFooter', { url: sourceUrl }, `Source: ${sourceUrl}`)}\n`;
   }
 
   /**
@@ -406,20 +435,47 @@
   async function copyMarkdownFlow(originalUrl) {
     const finalMd = buildMarkdownText(originalUrl);
     if (!finalMd) {
-      showToast('Could not extract article text');
+      showToast(t('toast.extractFail', null, 'Could not extract article text'));
       return { ok: false };
     }
     try {
       await navigator.clipboard.writeText(finalMd);
-      showToast('Copied article as Markdown!');
+      showToast(t('toast.copied', null, 'Copied article as Markdown!'));
       return { ok: true };
     } catch {
       if (legacyCopyToClipboard(finalMd)) {
-        showToast('Copied article as Markdown!');
+        showToast(t('toast.copied', null, 'Copied article as Markdown!'));
         return { ok: true };
       }
-      showToast('Clipboard write failed');
+      showToast(t('toast.copyFailed', null, 'Clipboard write failed'));
       return { ok: false };
+    }
+  }
+
+  /**
+   * Re-applies localized toolbar labels/tooltips after a live language change.
+   */
+  function refreshToolbarTexts() {
+    if (toolbarMdBtn) {
+      toolbarMdBtn.textContent = t('toolbar.copy', null, 'Copy Markdown');
+      toolbarMdBtn.title = t('toolbar.copyTitle', null, 'Copy full article as Markdown (Alt+M)');
+    }
+    if (toolbarBmBtn) {
+      toolbarBmBtn.textContent = toolbarBookmarked
+        ? t('toolbar.saved', null, '★ Saved')
+        : t('toolbar.save', null, '☆ Save');
+      toolbarBmBtn.title = t('toolbar.saveTitle', null, 'Save article to FreeMedium Bookmarks');
+    }
+    if (toolbarSwitchBtn) {
+      toolbarSwitchBtn.textContent = t('toolbar.next', null, '↻ Next Mirror');
+      toolbarSwitchBtn.title = t('toolbar.nextTitle', null, 'Current mirror slow or broken? Switch to next mirror');
+    }
+    if (toolbarOrigBtn) {
+      toolbarOrigBtn.textContent = t('toolbar.original', null, '↗ Original');
+      toolbarOrigBtn.title = t('toolbar.originalTitle', null, 'Open original publisher URL in new tab');
+    }
+    if (toolbarCloseBtn) {
+      toolbarCloseBtn.title = t('toolbar.hideTitle', null, 'Hide toolbar');
     }
   }
 
@@ -430,6 +486,9 @@
   async function mountMirrorToolbar() {
     if (toolbarHost) return;
 
+    // Never render the toolbar before the language has been resolved.
+    await i18nReady;
+
     const tabData = await chrome.runtime.sendMessage({
       type: 'GET_TAB_STATE',
       url: window.location.href
@@ -437,6 +496,7 @@
 
     const originalUrl = (tabData && tabData.originalUrl) || window.location.href;
     let isBookmarked = Boolean(tabData && tabData.isBookmarked);
+    toolbarBookmarked = isBookmarked;
 
     toolbarHost = document.createElement('div');
     toolbarHost.id = 'freemedium-mirror-toolbar';
@@ -535,15 +595,16 @@
     // Copy Markdown button
     const mdBtn = document.createElement('button');
     mdBtn.className = 'fm-btn primary';
-    mdBtn.title = 'Copy full article as Markdown (Alt+M)';
-    mdBtn.textContent = 'Copy Markdown';
+    mdBtn.title = t('toolbar.copyTitle', null, 'Copy full article as Markdown (Alt+M)');
+    mdBtn.textContent = t('toolbar.copy', null, 'Copy Markdown');
     mdBtn.addEventListener('click', () => copyMarkdownFlow(originalUrl));
+    toolbarMdBtn = mdBtn;
 
     // Bookmark button
     const bmBtn = document.createElement('button');
     bmBtn.className = 'fm-btn' + (isBookmarked ? ' bookmarked' : '');
-    bmBtn.title = 'Save article to FreeMedium Bookmarks';
-    bmBtn.textContent = isBookmarked ? '★ Saved' : '☆ Save';
+    bmBtn.title = t('toolbar.saveTitle', null, 'Save article to FreeMedium Bookmarks');
+    bmBtn.textContent = isBookmarked ? t('toolbar.saved', null, '★ Saved') : t('toolbar.save', null, '☆ Save');
     bmBtn.addEventListener('click', async () => {
       const res = await chrome.runtime.sendMessage({
         type: 'TOGGLE_BOOKMARK',
@@ -552,19 +613,23 @@
       });
       if (res && res.ok) {
         isBookmarked = res.bookmarked;
-        bmBtn.textContent = isBookmarked ? '★ Saved' : '☆ Save';
+        toolbarBookmarked = isBookmarked;
+        bmBtn.textContent = isBookmarked ? t('toolbar.saved', null, '★ Saved') : t('toolbar.save', null, '☆ Save');
         bmBtn.classList.toggle('bookmarked', isBookmarked);
-        showToast(isBookmarked ? 'Saved to bookmarks' : 'Removed from bookmarks');
+        showToast(isBookmarked
+          ? t('toast.bookmarkSaved', null, 'Saved to bookmarks')
+          : t('toast.bookmarkRemoved', null, 'Removed from bookmarks'));
       }
     });
+    toolbarBmBtn = bmBtn;
 
     // Switch Mirror button
     const switchBtn = document.createElement('button');
     switchBtn.className = 'fm-btn';
-    switchBtn.title = 'Current mirror slow or broken? Switch to next mirror';
-    switchBtn.textContent = '↻ Next Mirror';
+    switchBtn.title = t('toolbar.nextTitle', null, 'Current mirror slow or broken? Switch to next mirror');
+    switchBtn.textContent = t('toolbar.next', null, '↻ Next Mirror');
     switchBtn.addEventListener('click', () => {
-      showToast('Switching to next mirror...');
+      showToast(t('toast.switching', null, 'Switching to next mirror...'));
       chrome.runtime.sendMessage({
         type: 'MIRROR_LOAD_FAILED',
         url: window.location.href,
@@ -572,24 +637,27 @@
         manualSwitch: true
       });
     });
+    toolbarSwitchBtn = switchBtn;
 
     // Original article link
     const origBtn = document.createElement('button');
     origBtn.className = 'fm-btn';
-    origBtn.title = 'Open original publisher URL in new tab';
-    origBtn.textContent = '↗ Original';
+    origBtn.title = t('toolbar.originalTitle', null, 'Open original publisher URL in new tab');
+    origBtn.textContent = t('toolbar.original', null, '↗ Original');
     origBtn.addEventListener('click', () => {
       window.open(originalUrl, '_blank', 'noopener');
     });
+    toolbarOrigBtn = origBtn;
 
     // Dismiss button
     const closeBtn = document.createElement('button');
     closeBtn.className = 'fm-btn';
-    closeBtn.title = 'Hide toolbar';
+    closeBtn.title = t('toolbar.hideTitle', null, 'Hide toolbar');
     closeBtn.textContent = '✕';
     closeBtn.addEventListener('click', () => {
       toolbarHost.style.display = 'none';
     });
+    toolbarCloseBtn = closeBtn;
 
     const sep1 = document.createElement('span');
     sep1.className = 'fm-sep';
@@ -603,6 +671,20 @@
 
     shadow.append(style, bar, toastEl);
     document.documentElement.appendChild(toolbarHost);
+  }
+
+  // React to live language changes without reloading the mirror page.
+  if (
+    typeof chrome !== 'undefined' &&
+    chrome.storage &&
+    chrome.storage.onChanged &&
+    chrome.storage.onChanged.addListener
+  ) {
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area !== 'local' || !changes.settings) return;
+      setUiLanguage(changes.settings.newValue);
+      refreshToolbarTexts();
+    });
   }
 
   async function onMirrorReady() {

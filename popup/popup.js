@@ -31,6 +31,7 @@
   const btnBookmark = document.getElementById('btn-bookmark');
   const bookmarkIcon = document.getElementById('bookmark-icon');
   const selectMirror = document.getElementById('select-mirror');
+  const selectLanguage = document.getElementById('select-language');
   const inputCustomUrl = document.getElementById('input-custom-url');
   const btnPasteUnlock = document.getElementById('btn-paste-unlock');
 
@@ -69,6 +70,7 @@
   async function saveCurrentSettings() {
     const settings = {
       mirror: selectMirror.value,
+      language: selectLanguage.value,
       autoUnlockPaywall: toggleAutoUnlock.checked,
       showFloatingButton: toggleFloatingBtn.checked,
       autoFallback: toggleAutoFallback.checked,
@@ -76,7 +78,7 @@
       openInNewTab: toggleNewTab.checked
     };
     await chrome.storage.local.set({ settings });
-    showToast('Settings saved');
+    showToast(FM_I18N.t('toast.settingsSaved'));
   }
 
   async function renderLibrary() {
@@ -88,7 +90,7 @@
     if (!list.length) {
       const emptyLi = document.createElement('li');
       emptyLi.className = 'library-empty';
-      emptyLi.textContent = activeLibraryTab === 'recent' ? 'No unlocked articles yet.' : 'No saved bookmarks yet.';
+      emptyLi.textContent = activeLibraryTab === 'recent' ? FM_I18N.t('empty.recent') : FM_I18N.t('empty.saved');
       libraryList.appendChild(emptyLi);
       return;
     }
@@ -128,7 +130,7 @@
       const starBtn = document.createElement('button');
       starBtn.type = 'button';
       starBtn.className = 'lib-icon-btn' + (isSaved ? ' saved' : '');
-      starBtn.title = isSaved ? 'Remove bookmark' : 'Bookmark';
+      starBtn.title = FM_I18N.t(isSaved ? 'library.removeBookmark' : 'library.bookmark');
       starBtn.textContent = isSaved ? '★' : '☆';
       starBtn.addEventListener('click', async () => {
         await chrome.runtime.sendMessage({
@@ -142,7 +144,7 @@
       const delBtn = document.createElement('button');
       delBtn.type = 'button';
       delBtn.className = 'lib-icon-btn';
-      delBtn.title = 'Remove item';
+      delBtn.title = FM_I18N.t('library.removeItem');
       delBtn.textContent = '✕';
       delBtn.addEventListener('click', async () => {
         if (activeLibraryTab === 'recent') {
@@ -174,6 +176,7 @@
     currentTabState = stateRes || {};
     const settings = currentTabState.settings || {};
 
+    selectLanguage.value = FM_I18N.normalizeSetting(settings.language);
     selectMirror.value = settings.mirror || 'freedium_mirror';
     toggleAutoUnlock.checked = settings.autoUnlockPaywall !== false;
     toggleFloatingBtn.checked = settings.showFloatingButton !== false;
@@ -186,18 +189,18 @@
         const u = new URL(activeTab.url);
         currentHostEl.textContent = u.hostname.replace(/^www\./, '');
         if (isMirrorHostname(u.hostname)) {
-          statusPill.textContent = 'Reading on Mirror';
+          statusPill.textContent = FM_I18N.t('status.readingMirror');
           statusPill.classList.add('is-mirror');
-          btnUnlockLabel.textContent = 'Switch to Next Mirror';
+          btnUnlockLabel.textContent = FM_I18N.t('unlock.nextMirror');
         } else {
-          statusPill.textContent = 'Ready to Unlock';
-          btnUnlockLabel.textContent = 'Unlock Current Tab';
+          statusPill.textContent = FM_I18N.t('status.readyToUnlock');
+          btnUnlockLabel.textContent = FM_I18N.t('unlock.current');
         }
       } catch {
-        currentHostEl.textContent = 'Web Page';
+        currentHostEl.textContent = FM_I18N.t('currentTab.webPage');
       }
     } else {
-      currentHostEl.textContent = 'System / Empty Tab';
+      currentHostEl.textContent = FM_I18N.t('currentTab.system');
       btnUnlockCurrent.disabled = true;
     }
 
@@ -241,7 +244,7 @@
     try {
       const res = await chrome.tabs.sendMessage(activeTab.id, { type: 'EXTRACT_MARKDOWN' });
       if (!res || !res.ok || !res.markdown) {
-        showToast('Could not extract article text from this tab');
+        showToast(FM_I18N.t('toast.extractFailTab'));
         return;
       }
 
@@ -273,9 +276,9 @@
         }
       }
 
-      showToast(copied ? 'Copied article as Markdown!' : 'Clipboard write failed');
+      showToast(copied ? FM_I18N.t('toast.copied') : FM_I18N.t('toast.copyFailed'));
     } catch {
-      showToast('Cannot extract Markdown on this tab');
+      showToast(FM_I18N.t('toast.cannotExtract'));
     }
   });
 
@@ -289,7 +292,7 @@
     if (res && res.ok) {
       bookmarkIcon.textContent = res.bookmarked ? '★' : '☆';
       btnBookmark.classList.toggle('saved', res.bookmarked);
-      showToast(res.bookmarked ? 'Saved to bookmarks' : 'Removed from bookmarks');
+      showToast(res.bookmarked ? FM_I18N.t('toast.bookmarkSaved') : FM_I18N.t('toast.bookmarkRemoved'));
       await renderLibrary();
     }
   });
@@ -327,11 +330,11 @@
       }
     }
     if (!val) {
-      showToast('Paste a URL or type one');
+      showToast(FM_I18N.t('toast.pastePrompt'));
       return;
     }
     if (!val.startsWith('http')) {
-      showToast('Enter a valid http/https article URL');
+      showToast(FM_I18N.t('toast.invalidUrl'));
       return;
     }
     await chrome.runtime.sendMessage({
@@ -350,6 +353,11 @@
 
   [toggleAutoUnlock, toggleFloatingBtn, toggleAutoFallback, toggleHidePopups, toggleNewTab].forEach((el) => {
     el.addEventListener('change', saveCurrentSettings);
+  });
+
+  selectLanguage.addEventListener('change', async () => {
+    await saveCurrentSettings();
+    window.location.reload();
   });
 
   tabRecent.addEventListener('click', async () => {
@@ -373,13 +381,20 @@
   btnClearList.addEventListener('click', async () => {
     if (activeLibraryTab === 'recent') {
       await chrome.storage.local.set({ history: [] });
-      showToast('Cleared recent history');
+      showToast(FM_I18N.t('toast.clearedRecent'));
     } else {
       await chrome.storage.local.set({ bookmarks: [] });
-      showToast('Cleared saved bookmarks');
+      showToast(FM_I18N.t('toast.clearedSaved'));
     }
     await renderLibrary();
   });
 
-  initPopup();
+  FM_I18N.initFromStorage().then(() => {
+    FM_I18N.apply(document);
+    initPopup();
+  }).catch(() => {
+    FM_I18N.setLanguage('auto');
+    FM_I18N.apply(document);
+    initPopup();
+  });
 })();
